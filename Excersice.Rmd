@@ -1,0 +1,356 @@
+---
+title: "Analysis of the Iris Data set"
+author: "Deboleena Ganguly"
+date: "July 3, 2019"
+output: pdf_document
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(include = TRUE)
+```
+
+```{r}
+#Loading libraries 
+library(data.table) #To plot confusion matrix in table format
+library(dplyr)#Data Wrangling and cleaning
+library(ROCR) #To plot R
+library(caret) #Cross validation and Machine learning algorithms
+library(DataExplorer) #Explore Dataste eg. Missing values , plot distribution
+library(readr) #To read csv and basic files
+library(stringr) #For string manipulation
+library(gridExtra) #To plot graphs together
+library(grid)#To plot graphs together
+library("FactoMineR")
+library("factoextra")
+```
+
+```{r}
+#Loading the data into R data frame Iris
+iris <- read.csv("C:/Users/Deboleena/OneDrive - Southern Methodist University/Desktop/iris_files/iris.data", header=FALSE, stringsAsFactors = FALSE)
+iris_names <- read_csv("C:/Users/Deboleena/OneDrive - Southern Methodist University/Desktop/iris_files/iris.names")
+```
+
+```{r}
+#Eyeballing the first few rows of the Data.
+head(iris)
+```
+```{r}
+#Data Preparation 
+#preprocessing the data and getting it into shape for modeling 
+
+#1. Labelling the Column atrributes
+colnames(iris)[colnames(iris)=="V1"] <- "sepalLength"
+colnames(iris)[colnames(iris)=="V2"] <- "sepalWidth"
+colnames(iris)[colnames(iris)=="V3"] <- "petalLength"
+colnames(iris)[colnames(iris)=="V4"] <- "petalWidth"
+colnames(iris)[colnames(iris)=="V5"] <- "Type"
+
+head(iris)
+```
+```{r}
+#Omiting suffix iris from each class entry for better readability 
+iris$Type <- str_remove(iris$Type, "Iris-")
+```
+```{r}
+#Check column labels
+head(iris)
+```
+```{r}
+#Changing iris class into factor
+iris$Type <- as.factor(iris$Type)
+```
+
+
+```{r}
+#Final Structure of Iris Dataset
+str(iris)
+```
+
+```{r}
+#Summary statistics of column variables 
+summary(iris)
+```
+
+```{r}
+#Data Scrubbing and EDA
+#Check for missing values
+plot_missing(iris)
+```
+
+```{r}
+#Checking ouliers by Boxplot
+#visually by plotting box plots
+
+p1 <- ggplot(iris, aes(Type, sepalLength, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Sepal Length (cm)", breaks= seq(0,30, by=.5))+
+        theme(legend.position="none")
+
+p2 <-  ggplot(iris, aes(Type, sepalWidth, fill=Type)) + 
+         geom_boxplot()+
+         scale_y_continuous("Sepal Width (cm)", breaks= seq(0,30, by=.5))+
+         theme(legend.position="none")
+
+p3 <- ggplot(iris, aes(Type, petalLength, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Petal Length (cm)", breaks= seq(0,30, by=.5))+
+        theme(legend.position="none")
+        
+p4 <-  ggplot(iris, aes(Type, petalWidth, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Petal Width (cm)", breaks= seq(0,30, by=.5))+
+        labs(title = "Iris Box Plot", x = "Species")
+
+# Plot all visualizations
+grid.arrange(p1  + ggtitle(""),
+             p2  + ggtitle(""),
+             p3 + ggtitle(""),
+             p4 + ggtitle(""),
+             nrow = 2,
+             top = textGrob("Sepal and Petal Box Plot", 
+                            gp=gpar(fontsize=15))
+)
+```
+```{r}
+#Individual column Variable histograms.
+
+g1 <- ggplot(data=iris, aes(x=sepalLength))+
+  geom_histogram(binwidth=0.1, fill="yellow", color = "black") + 
+  xlab("Sepal Length (cm)") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Sepal Length")+
+  geom_vline(data=iris, aes(xintercept = mean(sepalLength)),linetype="dashed",color="black")+
+  geom_text(aes(x=mean(sepalLength), label=round(mean(sepalLength), digits = 3), 
+                y=11), colour="blue", angle=90, vjust = 1.2, text=element_text(size=8))
+
+g2 <- ggplot(data=iris, aes(x=sepalWidth))+
+  geom_histogram(binwidth=0.1, fill="yellow", color = "black") + 
+  xlab("Sepal Width (cm)") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Sepal Width")+
+  geom_vline(data=iris, aes(xintercept = mean(sepalWidth)),linetype="dashed",color="black")+
+  geom_text(aes(x=mean(sepalWidth), label=round(mean(sepalWidth), digits = 3), 
+                y=17), colour="blue", angle=90, vjust = 1.2, text=element_text(size=8))
+
+g3 <- ggplot(data=iris, aes(x=petalLength))+
+  geom_histogram(binwidth=0.1, fill="yellow", color = "black") + 
+  xlab("Petal Length (cm)") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Petal Length")+
+  geom_vline(data=iris, aes(xintercept = mean(petalLength)),linetype="dashed",color="black")+
+  geom_text(aes(x=mean(petalLength), label=round(mean(petalLength), digits = 3), 
+                y=8), colour="blue", angle=90, vjust = 1.2, text=element_text(size=8))
+
+g4 <- ggplot(data=iris, aes(x=petalWidth))+
+  geom_histogram(binwidth=0.1, fill="yellow", color = "black") + 
+  xlab("Petal Width (cm)") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Petal Width")+
+  geom_vline(data=iris, aes(xintercept = mean(petalWidth)),linetype="dashed",color="black")+
+  geom_text(aes(x=mean(petalWidth), label=round(mean(petalWidth), digits = 3), 
+                y=17), colour="blue", angle=90, vjust = 1.2, text=element_text(size=8))
+
+#Arranging all histogram plots into one image ouput
+grid.arrange(g1,
+             g2,
+             g3,
+             g4,
+             nrow = 1,
+             top = textGrob("Iris Frequency Histogram", 
+                            gp=gpar(fontsize=15))
+)
+```
+
+```{r}
+#Distribution of each column variable broken down by Iris Types/Species
+
+h1 <- ggplot(data=iris, aes(x=sepalLength, fill = Type))+
+  geom_histogram(binwidth=0.1, color="black") + 
+  facet_wrap(iris$Type)+
+  xlab("Sepal Length (cm)") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Sepal Length")+
+  geom_vline(data=iris, aes(xintercept = mean(sepalLength)),linetype="dashed",color="black")+
+  geom_text(aes(x=mean(sepalLength), label=round(mean(sepalLength), digits = 3), 
+                y=6), colour="blue", angle=90, vjust = 1.2, text=element_text(size=8))
+
+h2 <- ggplot(data=iris, aes(x=sepalWidth, fill = Type))+
+  geom_histogram(binwidth=0.1, color="black") + 
+  facet_wrap(iris$Type)+
+  xlab("Sepal Width (cm)") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Sepal Width")+
+  geom_vline(data=iris, aes(xintercept = mean(sepalWidth)),linetype="dashed",color="black")+
+  geom_text(aes(x=mean(sepalWidth), label=round(mean(sepalWidth), digits = 3), 
+                y=10), colour="blue", angle=90, vjust = 1.2, text=element_text(size=8))
+
+h3 <- ggplot(data=iris, aes(x=petalLength, fill = Type))+
+  geom_histogram(binwidth=0.1, color="black") + 
+  facet_wrap(iris$Type)+
+  xlab("Petal Length (cm)") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Petal Length")+
+  geom_vline(data=iris, aes(xintercept = mean(petalLength)),linetype="dashed",color="black")+
+  geom_text(aes(x=mean(petalLength), label=round(mean(petalLength), digits = 3), 
+                y=10), colour="blue", angle=90, vjust = 1.2, text=element_text(size=8))
+
+h4 <- ggplot(data=iris, aes(x=petalWidth, fill = Type))+
+  geom_histogram(binwidth=0.1, color="black") + 
+  facet_wrap(iris$Type)+
+  xlab("Petal Width (cm)") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Petal Width")+
+  geom_vline(data=iris, aes(xintercept = mean(petalWidth)),linetype="dashed",
+             color="black")+
+  geom_text(aes(x=mean(petalWidth), label=round(mean(petalWidth), digits = 3), 
+                y=10), colour="blue", angle=90, vjust = 1.2, text=element_text(size=8))
+
+#Arranging Plots into single image output
+grid.arrange(h1 + ggtitle(""),
+             h2 + ggtitle(""),
+             nrow = 2,
+             top = textGrob("Iris Frequency Histogram", 
+                            gp=gpar(fontsize=15))
+)
+
+grid.arrange(h3 + ggtitle(""),
+             h4 + ggtitle(""),
+             nrow = 2,
+             top = textGrob("Iris Frequency Histogram", 
+                            gp=gpar(fontsize=15))
+)
+```
+
+```{r}
+#Pie chart of each Iris specie
+dfc <- iris %>%
+  group_by(Type) %>%
+  summarise(count = n()) %>%
+  mutate(share=count/sum(count)*100.0) %>%
+  arrange(desc(share))
+
+
+ggplot(dfc, aes("", share, fill = Type)) +
+    geom_bar(width = 1, size = 1, color = "white", stat = "identity") +
+    coord_polar("y") +
+    geom_text(aes(label = paste0(round(share), "%")), 
+              position = position_stack(vjust = 0.5)) +
+    labs(x = NULL, y = NULL, fill = NULL, 
+         title = "Distributiton of each Flower type") +
+    guides(fill = guide_legend(reverse = TRUE)) +
+    scale_fill_manual(values = c("#ffd700", "#bcbcbc", "#ffa500", "#254290")) +
+    theme_classic() +
+    theme(axis.line = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          plot.title = element_text(hjust = 0.5, color = "#666666"))
+```
+
+```{r}
+#Scatter Plots for Variable correlation
+s1 <- ggplot(data=iris, aes(x=sepalLength, y=sepalWidth, color = Type))+
+  facet_wrap(iris$Type)+
+  geom_point()+
+  xlab("Sepal Length (cm)") +  
+  ylab("Sepal Width (cm)") + 
+  theme(legend.position="none")+
+  ggtitle("Scatter plot of Sepal Width and Length")
+
+s2 <- ggplot(data=iris, aes(x=petalLength, y=petalWidth, color = Type))+
+  facet_wrap(iris$Type)+
+  geom_point()+
+  xlab("Petal Length (cm)") +  
+  ylab("Petal Width (cm)") + 
+  theme(legend.position="none")+
+  ggtitle("Scatter plot of Petal Width and Length")
+
+s1
+s2
+
+```
+
+```{r}
+#Heat map for correlation between each variable.
+plot_correlation(iris)
+```
+```{r}
+#Feature engineering 
+
+#Running the PCA algorithm on numerical variables only
+iris.pca <- prcomp(iris[,c(1:4)], center = TRUE,scale. = TRUE)
+
+summary(iris.pca)
+```
+
+```{r}
+#Scree plot
+fviz_eig(iris.pca, addlabels = TRUE, ylim = c(0, 80))
+```
+```{r}
+#Scatter Plot of observations against PC1 and PC2
+fviz_pca_biplot(iris.pca, 
+                col.ind = iris$Type, palette = "jco", 
+                addEllipses = TRUE, label = "var",
+                col.var = "black", repel = TRUE,
+                legend.title = "Species")
+```
+```{r}
+#Splitting the Data
+set.seed(1234)
+split_data <- createDataPartition(iris$sepalLength, p = 0.75, list = FALSE)
+train_data <- iris[split_data,]
+test_data <- iris[-split_data,]
+```
+```{r}
+#K-Fold Crossvalidation with K = 5
+set.seed(400)
+ctrl <- trainControl(method="repeatedcv",repeats = 5)
+```
+```{r}
+#Learnng KNN model with Train Data.
+knnFit <- train(Type ~ ., data = train_data, method = "knn", trControl = ctrl, preProcess = c("center","scale"),tuneLength = 20)
+knnFit
+plot(knnFit)
+#Predicting with Test Data
+pred_knn <- as.factor(predict(knnFit, test_data))
+#Plotting Confusion Matrix
+table(test_data$Type, pred_knn)
+```
+```{r}
+#ploting variable importance by KNNFIT
+plot(varImp(knnFit))
+```
+
+```{r}
+#Learnng Random Forest model with Train Data.
+rf_fit <- train(Type ~ ., data = train_data, method = "rf", trControl = ctrl, preProcess = c("center","scale"),tuneLength = 20)
+rf_fit
+#Predicting with Test Data
+pred_rfit <- as.factor(predict(rf_fit, test_data)) 
+#Plotting Confusion Matrix
+table(test_data$Type, pred_rfit)
+#ploting variable importance by Random Forest Fit
+plot(varImp(rf_fit))
+```
+```{r}
+#Learning Naive bayes model with Train Data.
+nb_fit <- train(Type ~ ., data = train_data, method = "nb", trControl = ctrl, preProcess = c("center","scale"),tuneLength = 20)
+#Predicting with Test Data
+pred_nbfit <- as.factor(predict(nb_fit, test_data)) 
+#Confusion Matrix
+table(test_data$Type, pred_nbfit)
+#Plot variable Importance
+plot(varImp(nb_fit))
+```
+Acurracy of K-NN and Naive Bayes model are 
